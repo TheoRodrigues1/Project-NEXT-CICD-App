@@ -1,0 +1,69 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  # ─────────────────────────────────────────────
+  # JOB 1 – Integração Contínua (CI)
+  # ─────────────────────────────────────────────
+  ci:
+    name: Lint, Test & Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Rodar ESLint
+        run: npm run lint
+
+      - name: Rodar testes
+        run: npm run test
+
+      - name: Build da aplicação
+        run: npm run build
+        env:
+          NEXT_PUBLIC_BASE_PATH: /${{ github.event.repository.name }}
+
+      - name: Fazer upload do artefato de build
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./out
+
+  # ─────────────────────────────────────────────
+  # JOB 2 – Deploy no GitHub Pages (CD)
+  # Executa apenas em push na branch main
+  # ─────────────────────────────────────────────
+  deploy:
+    name: Deploy para GitHub Pages
+    needs: ci
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    permissions:
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy no GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
